@@ -1,0 +1,65 @@
+service: matf-rvtech-punjaci
+frameworkVersion: "3"
+
+plugins:
+  - serverless-localstack
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  environment:
+    CHARGERS_TABLE: Chargers
+
+functions:
+  getChargersByTown:
+    handler: getChargers.getChargersByTown
+    description: Get chargers by town (TownIndex)  
+    events:
+      - http:
+          path: chargers/{town}
+          method: get
+
+resources:
+  Resources:
+    ChargersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.CHARGERS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: chargerId
+            AttributeType: S
+          - AttributeName: town
+            AttributeType: S
+        KeySchema:
+          - AttributeName: chargerId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: TownIndex
+            KeySchema:
+              - AttributeName: town
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    WebsiteBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: matf-rvtech-website
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: error.html
+
+    WebsiteBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref WebsiteBucket
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal: "*"
+              Action: s3:GetObject
+              Resource: !Join ["", ["arn:aws:s3:::", !Ref WebsiteBucket, "/*"]]
