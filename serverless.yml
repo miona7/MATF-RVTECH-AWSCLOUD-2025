@@ -14,11 +14,21 @@ provider:
 functions:
   getChargersByTown:
     handler: getChargers.getChargersByTown
-    description: Get chargers by town (TownIndex)  
+    description: Get chargers by town  
     events:
       - http:
           path: chargers/{town}
           method: get
+  syncOCMdata:
+    handler: syncOCMdata.syncOCM
+    description: Sync data from Open Charge Map
+    events:
+      - http:
+          # sync zbog testiranja
+          path: sync
+          method: get
+      # - schedule:
+      #     rate: rate(1 minute)
 
 resources:
   Resources:
