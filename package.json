@@ -16,8 +16,8 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "deploy-frontend": "awslocal s3 sync ./web s3://punjaci-website",
-    "redeploy": "docker-compose down -v && docker-compose up -d && sleep 5 && npx serverless deploy"
+    "deploy-frontend": "awslocal s3 sync ./web s3://matf-rvtech-website",
+    "redeploy": "docker-compose down -v && docker-compose up -d && npx serverless deploy"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.972.0",

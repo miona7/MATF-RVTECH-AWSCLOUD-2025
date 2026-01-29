@@ -13,7 +13,7 @@ const DYNAMODB_ENDPOINT = process.env.LOCALSTACK_HOSTNAME
 
 console.log('DynamoDB endpoint:', DYNAMODB_ENDPOINT);
 console.log('OCM URL:', OCM_URL);
-console.log('OCM API KEY set:', OCM_API_KEY);
+console.log('OCM API KEY set:', !!OCM_API_KEY);
 
 const client = new DynamoDBClient({
   endpoint: DYNAMODB_ENDPOINT,
@@ -22,7 +22,7 @@ const client = new DynamoDBClient({
 
 const docClient = DynamoDBDocumentClient.from(client);
 
-const ALLOWED_ORIGIN = 'http://matf-rvtech-website.s3-website.localhost.localstack.cloud:4566';
+const ALLOWED_ORIGIN = 'https://matf-rvtech-website.s3-website.localhost.localstack.cloud:4566';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': ALLOWED_ORIGIN,

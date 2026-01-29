@@ -21,6 +21,7 @@ functions:
       - http:
           path: chargers/{town}
           method: get
+          cors: true
   syncOCMdata:
     handler: syncOCMdata.syncOCM
     description: Sync data from Open Charge Map
@@ -29,6 +30,7 @@ functions:
           # sync zbog testiranja
           path: sync
           method: get
+          cors: true
       # - schedule:
       #     rate: rate(1 minute)
 
