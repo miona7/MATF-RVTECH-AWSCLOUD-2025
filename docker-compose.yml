@@ -1,0 +1,17 @@
+services:
+  localstack:
+    container_name: matf-rvtech-2025-localstack
+    image: localstack/localstack
+    ports:
+      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:4510-4559:4510-4559" 
+    environment:
+      - SERVICES=lambda,s3,logs,dynamodb,cloudwatch,apigateway,cloudformation,iam,events
+      - DEBUG=${DEBUG:-0}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "~/localstack_data:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+volumes:
+  localstack_data:
