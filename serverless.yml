@@ -59,8 +59,8 @@ resources:
         BucketName: matf-rvtech-website
         AccessControl: PublicRead
         WebsiteConfiguration:
-          IndexDocument: index.html
-          ErrorDocument: error.html
+          IndexDocument: web/index.html
+          ErrorDocument: web/error.html
 
     WebsiteBucketPolicy:
       Type: AWS::S3::BucketPolicy
