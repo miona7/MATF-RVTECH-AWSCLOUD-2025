@@ -14,8 +14,7 @@ const client = new DynamoDBClient({
 
 const docClient = DynamoDBDocumentClient.from(client);
 
-const ALLOWED_ORIGIN =
-  'http://matf-rvtech-website.s3-website.localhost.localstack.cloud:4566';
+const ALLOWED_ORIGIN = 'https://matf-rvtech-website.s3-website.localhost.localstack.cloud:4566';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
