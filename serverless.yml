@@ -10,6 +10,8 @@ provider:
   region: us-east-1
   environment:
     CHARGERS_TABLE: Chargers
+    OCM_URL: https://api.openchargemap.io/v3/poi/
+    OCM_API_KEY: ${env:OCM_API_KEY}
 
 functions:
   getChargersByTown:
