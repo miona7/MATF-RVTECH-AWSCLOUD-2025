@@ -16,7 +16,7 @@ The project implements a cloud-based web application that visualizes **electric 
 
 ## 🎯 Project Objectives
 
-- Understand the **fundamentals of cloud computing** ☁️  
+- Understand the **fundamentals of cloud computing**   
 - Work with **core AWS services**  
 - Develop and deploy **cloud-based applications**  
 - Gain **practical experience** with cloud infrastructure and tooling  
