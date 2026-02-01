@@ -1,0 +1,87 @@
+service: matf-rvtech-punjaci
+frameworkVersion: "3"
+
+plugins:
+  - serverless-localstack
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  environment:
+    CHARGERS_TABLE: Chargers
+    OCM_URL: https://api.openchargemap.io/v3/poi/
+    OCM_API_KEY: ${env:OCM_API_KEY}
+
+functions:
+  getChargersByTown:
+    handler: getChargers.getChargersByTown
+    description: Get chargers by town  
+    events:
+      - http:
+          path: chargers/{town}
+          method: get
+          cors: true
+  getAllChargers:
+    handler: getChargers.getAllChargers
+    description: Get all chargers
+    events:
+      - http:
+          path: chargers
+          method: get
+          cors: true
+  syncOCMdata:
+    handler: syncOCMdata.syncOCM
+    description: Sync data from Open Charge Map
+    events:
+      - http:
+          # sync zbog testiranja
+          path: sync
+          method: get
+          cors: true
+      # - schedule:
+      #     rate: rate(1 minute)
+
+resources:
+  Resources:
+    ChargersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.CHARGERS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: chargerId
+            AttributeType: S
+          - AttributeName: town
+            AttributeType: S
+        KeySchema:
+          - AttributeName: chargerId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: TownIndex
+            KeySchema:
+              - AttributeName: town
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    WebsiteBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: matf-rvtech-website
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: error.html
+
+    WebsiteBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref WebsiteBucket
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal: "*"
+              Action: s3:GetObject
+              Resource: !Join ["", ["arn:aws:s3:::", !Ref WebsiteBucket, "/*"]]

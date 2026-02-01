@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="sr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EV Punjači - Mapa</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .search-form {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+
+      input[type="text"] {
+        padding: 0.6rem 1rem;
+        font-size: 1rem;
+        border: none;
+        border-radius: 6px;
+        width: 200px;
+      }
+
+      button {
+        padding: 0.6rem 1.2rem;
+        font-size: 1rem;
+        border: none;
+        border-radius: 6px;
+        background: white;
+        color: #667eea;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      button:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+
+      .sync-btn {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.3);
+      }
+
+      #status {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+        background: rgba(255,255,255,0.1);
+        border-radius: 6px;
+      }
+
+      #map {
+        flex: 1;
+        min-height: 500px;
+      }
+
+      .charger-popup {
+        font-size: 0.9rem;
+        line-height: 1.4;
+      }
+
+      .charger-popup h3 {
+        margin-bottom: 0.5rem;
+        color: #667eea;
+      }
+
+      .charger-popup p {
+        margin: 0.2rem 0;
+      }
+
+      .charger-popup .label {
+        font-weight: bold;
+        color: #555;
+      }
+
+      .radius-select {
+        padding: 0.6rem 1rem;
+        font-size: 1rem;
+        border-radius: 6px;
+        border: none;
+        background: white;
+        color: #333;
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23667eea' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.8rem center;
+        background-size: 1rem;
+        padding-right: 2.2rem;
+      }
+
+      .near-btn {
+        background: #ff6b6b;
+        color: white;
+      }
+
+      .near-btn:hover {
+        background: #ff5252;
+      }
+
+      .user-marker {
+        font-size: 30px;
+      }
+
+      footer {
+        background: #333;
+        color: white;
+        padding: 0.8rem;
+        text-align: center;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>⚡ EV Punjači - Srbija</h1>
+      <div class="search-form">
+        <input
+          type="text"
+          id="townInput"
+          placeholder="Unesite grad (npr. Belgrade)"
+          value="Belgrade"
+        />
+
+        <button id="searchBtn">Pretraži</button>
+
+        <button id="syncBtn" class="sync-btn">Sync OCM</button>
+
+        <button id="nearMeBtn" class="near-btn">Koristi moju lokaciju</button>
+
+        <select id="radiusSelect" class="radius-select">
+          <option value="10">10 km</option>
+          <option value="30">30 km</option>
+          <option value="50" selected>50 km</option>
+          <option value="100">100 km</option>
+          <option value="200">200 km</option>
+        </select>
+      </div>
+      <div id="status"></div>
+    </header>
+
+    <div id="map"></div>
+
+    <footer>
+      Podaci: <a href="https://openchargemap.org" target="_blank" style="color: #667eea;">Open Charge Map</a> | 
+      LocalStack Demo
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      // funkcija za racunanje distance preko latitude i longitude
+      function distanceKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(lat1 * Math.PI / 180) *
+          Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) ** 2;
+
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+      
+      function getUserLocation() {
+        return new Promise((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error('Geolocation not supported'));
+          }
+
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              resolve({
+                lat: pos.coords.latitude,
+                lon: pos.coords.longitude,
+              });
+            },
+            (err) => reject(err)
+          );
+        });
+      }
+      
+      async function findNearbyChargers() {
+        markersLayer.clearLayers();
+
+        const status = document.getElementById('status');
+        const radiusKm = Number(document.getElementById('radiusSelect').value);
+
+        try {
+          status.textContent = 'Dobijanje lokacije...';
+          const user = await getUserLocation();
+
+          status.textContent = 'Učitavanje punjača...';
+          const response = await fetch(`${API_BASE_URL}/chargers`);
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Greška');
+          }
+
+          const nearby = data.chargers.filter(c =>
+            distanceKm(user.lat, user.lon, c.latitude, c.longitude) <= radiusKm
+          );
+
+          displayChargers(nearby);
+
+          markersLayer.addLayer(
+            L.marker([user.lat, user.lon], { icon: userIcon })
+              .bindPopup('📍 Vaša trenutna lokacija')
+          );
+
+          markersLayer.addLayer(
+            L.circle([user.lat, user.lon], {
+              radius: radiusKm * 1000,
+              color: 'red',
+              fillOpacity: 0.1,
+            })
+          );
+
+          status.textContent =
+            `Pronađeno ${nearby.length} punjača u radijusu ${radiusKm} km`;
+
+        } catch (err) {
+          status.textContent = 'Greška: ' + err.message;
+        }
+      }
+
+
+      const API_ID = 'r7r4zvlniq'; // menja se svaki put posle docker compose up
+      const API_BASE_URL = `http://localhost:4566/restapis/${API_ID}/dev/_user_request_`;
+      
+      const map = L.map('map').setView([44.0165, 21.0059], 7);
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      let markersLayer = L.layerGroup().addTo(map);
+
+      const userIcon = L.divIcon({
+        html: '📍',
+        className: 'user-marker',
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+      });
+
+      const chargerIcon = L.divIcon({
+        html: '⚡',
+        className: 'charger-marker',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+      });
+
+      function displayChargers(chargers) {
+        markersLayer.clearLayers();
+
+        if (chargers.length === 0) {
+          document.getElementById('status').textContent = 'Nema punjača za ovaj grad';
+          return;
+        }
+
+        const bounds = [];
+
+        chargers.forEach(charger => {
+          if (charger.latitude && charger.longitude) {
+            const marker = L.marker([charger.latitude, charger.longitude])
+              .addTo(markersLayer);
+
+            const popupContent = `
+              <div class="charger-popup">
+                <h3>${charger.title || 'EV Punjač'}</h3>
+                <p><span class="label">Adresa:</span> ${charger.addressLine1 || 'N/A'}</p>
+                <p><span class="label">Grad:</span> ${charger.town} ${charger.postcode ? `(${charger.postcode})` : ''}</p>
+                <p><span class="label">Broj priključaka:</span> ${charger.numberOfPoints || 'N/A'}</p>
+                <p><span class="label">Verifikovan:</span> ${charger.isRecentlyVerified ? 'Da ✓' : 'Ne'}</p>
+                <p><span class="label">ID:</span> ${charger.chargerId}</p>
+              </div>
+            `;
+            marker.bindPopup(popupContent);
+
+            bounds.push([charger.latitude, charger.longitude]);
+          }
+        });
+
+        if (bounds.length > 0) {
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+
+        document.getElementById('status').textContent = `Prikazano ${chargers.length} punjača`;
+      }
+
+      async function searchChargers(town) {
+        markersLayer.clearLayers();
+        const status = document.getElementById('status');
+        const searchBtn = document.getElementById('searchBtn');
+
+        searchBtn.disabled = true;
+        searchBtn.textContent = 'Učitavanje...';
+        status.textContent = 'Pretraga...';
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/chargers/${encodeURIComponent(town)}`);
+          const data = await response.json();
+
+          if (response.ok) {
+            displayChargers(data.chargers);
+            console.log('Podaci:', data);
+          } else {
+            status.textContent = 'Greška: ' + (data.error || 'Nepoznata greška');
+          }
+        } catch (error) {
+          status.textContent = 'Greška: ' + error.message;
+          console.error(error);
+        } finally {
+          searchBtn.disabled = false;
+          searchBtn.textContent = 'Pretraži';
+        }
+      }
+
+      async function syncOCM() {
+        const status = document.getElementById('status');
+        const syncBtn = document.getElementById('syncBtn');
+
+        syncBtn.disabled = true;
+        syncBtn.textContent = 'Sinhronizacija...';
+        status.textContent = 'Sinhronizacija sa OCM...';
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/sync`); 
+          const data = await response.json();
+          status.textContent = `Sync završen! Upisano: ${data.count}, Obrisano: ${data.deleted}`;
+          console.log('Sync rezultat:', data);
+        } catch (error) {
+          status.textContent = 'Sync greška: ' + error.message;
+          console.error(error);
+        } finally {
+          syncBtn.disabled = false;
+          syncBtn.textContent = 'Sync OCM';
+        }
+      }
+
+      document
+      .getElementById('nearMeBtn')
+      .addEventListener('click', findNearbyChargers);
+
+      document.getElementById('searchBtn').addEventListener('click', () => {
+        const town = document.getElementById('townInput').value.trim();
+        if (town) {
+          searchChargers(town);
+        }
+      });
+
+      document.getElementById('townInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          const town = document.getElementById('townInput').value.trim();
+          if (town) {
+            searchChargers(town);
+          }
+        }
+      });
+
+      document.getElementById('syncBtn').addEventListener('click', syncOCM);
+    </script>
+  </body>
+</html>
