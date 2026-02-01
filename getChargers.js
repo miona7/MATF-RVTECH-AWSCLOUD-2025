@@ -1,5 +1,5 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 
 const TABLE_NAME = process.env.CHARGERS_TABLE;
 
@@ -66,4 +66,29 @@ exports.getChargersByTown = async (event) => {
       body: JSON.stringify({ error: error.message }),
     };
   }
-};  
+};
+exports.getAllChargers = async () => {
+  try {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: TABLE_NAME,
+      })
+    );
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        count: result.Items?.length || 0,
+        chargers: result.Items || [],
+      }),
+    };
+  } catch (error) {
+    console.error('Greška pri Scan-u:', error);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: error.message }),
+    };
+  }
+};

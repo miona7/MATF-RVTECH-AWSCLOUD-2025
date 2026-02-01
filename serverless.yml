@@ -22,6 +22,14 @@ functions:
           path: chargers/{town}
           method: get
           cors: true
+  getAllChargers:
+    handler: getChargers.getAllChargers
+    description: Get all chargers
+    events:
+      - http:
+          path: chargers
+          method: get
+          cors: true
   syncOCMdata:
     handler: syncOCMdata.syncOCM
     description: Sync data from Open Charge Map
