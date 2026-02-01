@@ -111,39 +111,37 @@ exports.syncOCM = async () => {
     }, {});
 
     console.log(`Belgrade chargers: ${belgradeCount}/${items.length}`);
-    console.log('Chargers by town:', townCounts);
+    console.log('Chargers by town:', JSON.stringify(townCounts));
 
     const batches = [];
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
       batches.push(items.slice(i, i + BATCH_SIZE));
     }
 
-    for (const batch of batches) {
-      try {
-        await docClient.send(new BatchWriteCommand({
-          RequestItems: {
-            [TABLE_NAME]: batch.map(item => ({ PutRequest: { Item: item } }))
-          }
-        }));
-      } catch (batchError) {
-        console.error('BatchWrite error:', batchError.message);
-        throw batchError;
-      }
-    }
-    //Postoji opcija da se uradi sa Promise.all ali nekada nastaje throttling 
-    
-    //await Promise.all(
-    //   batches.map((batch) =>docClient.send(
-    //       new BatchWriteCommand({
-    //         RequestItems: {
-    //           [TABLE_NAME]: batch.map((item) => ({
-    //             PutRequest: { Item: item },
-    //           })),
-    //         },
-    //       })
-    //     )
-    //   )
-    // )
+    console.log(batches)
+
+    // Konkuretno izvrsavanje (mora da se ogranici, localstack pravi problem, javlja se throttling,
+    //                         ne ucitavaju se svi podaci uvek, 4/5 batcheva budu ucitani)
+
+    const CONCURRENCY_LIMIT = 3;
+
+    for (let i = 0; i < batches.length; i += CONCURRENCY_LIMIT) {
+    const slice = batches.slice(i, i + CONCURRENCY_LIMIT);
+
+    await Promise.all(
+      slice.map((batch) =>
+        docClient.send(
+          new BatchWriteCommand({
+            RequestItems: {
+              [TABLE_NAME]: batch.map((item) => ({
+                PutRequest: { Item: item },
+              })),
+            },
+          })
+        )
+      )
+    );
+  }
 
     console.log(`Written ${items.length} chargers to DynamoDB`);
 

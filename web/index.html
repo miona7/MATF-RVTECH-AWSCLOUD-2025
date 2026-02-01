@@ -107,6 +107,35 @@
         color: #555;
       }
 
+      .radius-select {
+        padding: 0.6rem 1rem;
+        font-size: 1rem;
+        border-radius: 6px;
+        border: none;
+        background: white;
+        color: #333;
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23667eea' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.8rem center;
+        background-size: 1rem;
+        padding-right: 2.2rem;
+      }
+
+      .near-btn {
+        background: #ff6b6b;
+        color: white;
+      }
+
+      .near-btn:hover {
+        background: #ff5252;
+      }
+
+      .user-marker {
+        font-size: 30px;
+      }
+
       footer {
         background: #333;
         color: white;
@@ -120,9 +149,26 @@
     <header>
       <h1>⚡ EV Punjači - Srbija</h1>
       <div class="search-form">
-        <input type="text" id="townInput" placeholder="Unesite grad (npr. Belgrade)" value="Belgrade" />
+        <input
+          type="text"
+          id="townInput"
+          placeholder="Unesite grad (npr. Belgrade)"
+          value="Belgrade"
+        />
+
         <button id="searchBtn">Pretraži</button>
+
         <button id="syncBtn" class="sync-btn">Sync OCM</button>
+
+        <button id="nearMeBtn" class="near-btn">Koristi moju lokaciju</button>
+
+        <select id="radiusSelect" class="radius-select">
+          <option value="10">10 km</option>
+          <option value="30">30 km</option>
+          <option value="50" selected>50 km</option>
+          <option value="100">100 km</option>
+          <option value="200">200 km</option>
+        </select>
       </div>
       <div id="status"></div>
     </header>
@@ -137,7 +183,86 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-      const API_ID = '26ks6175du';
+      // funkcija za racunanje distance preko latitude i longitude
+      function distanceKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(lat1 * Math.PI / 180) *
+          Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) ** 2;
+
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+      
+      function getUserLocation() {
+        return new Promise((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error('Geolocation not supported'));
+          }
+
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              resolve({
+                lat: pos.coords.latitude,
+                lon: pos.coords.longitude,
+              });
+            },
+            (err) => reject(err)
+          );
+        });
+      }
+      
+      async function findNearbyChargers() {
+        markersLayer.clearLayers();
+
+        const status = document.getElementById('status');
+        const radiusKm = Number(document.getElementById('radiusSelect').value);
+
+        try {
+          status.textContent = 'Dobijanje lokacije...';
+          const user = await getUserLocation();
+
+          status.textContent = 'Učitavanje punjača...';
+          const response = await fetch(`${API_BASE_URL}/chargers`);
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Greška');
+          }
+
+          const nearby = data.chargers.filter(c =>
+            distanceKm(user.lat, user.lon, c.latitude, c.longitude) <= radiusKm
+          );
+
+          displayChargers(nearby);
+
+          markersLayer.addLayer(
+            L.marker([user.lat, user.lon], { icon: userIcon })
+              .bindPopup('📍 Vaša trenutna lokacija')
+          );
+
+          markersLayer.addLayer(
+            L.circle([user.lat, user.lon], {
+              radius: radiusKm * 1000,
+              color: 'red',
+              fillOpacity: 0.1,
+            })
+          );
+
+          status.textContent =
+            `Pronađeno ${nearby.length} punjača u radijusu ${radiusKm} km`;
+
+        } catch (err) {
+          status.textContent = 'Greška: ' + err.message;
+        }
+      }
+
+
+      const API_ID = 'r7r4zvlniq'; // menja se svaki put posle docker compose up
       const API_BASE_URL = `http://localhost:4566/restapis/${API_ID}/dev/_user_request_`;
       
       const map = L.map('map').setView([44.0165, 21.0059], 7);
@@ -147,6 +272,13 @@
       }).addTo(map);
 
       let markersLayer = L.layerGroup().addTo(map);
+
+      const userIcon = L.divIcon({
+        html: '📍',
+        className: 'user-marker',
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+      });
 
       const chargerIcon = L.divIcon({
         html: '⚡',
@@ -194,6 +326,7 @@
       }
 
       async function searchChargers(town) {
+        markersLayer.clearLayers();
         const status = document.getElementById('status');
         const searchBtn = document.getElementById('searchBtn');
 
@@ -241,6 +374,10 @@
           syncBtn.textContent = 'Sync OCM';
         }
       }
+
+      document
+      .getElementById('nearMeBtn')
+      .addEventListener('click', findNearbyChargers);
 
       document.getElementById('searchBtn').addEventListener('click', () => {
         const town = document.getElementById('townInput').value.trim();
